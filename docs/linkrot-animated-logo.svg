@@ -1,0 +1,291 @@
+<svg id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" version="1.1" viewBox="0 0 2521 2911">
+  <defs>
+    <style>
+      .st2 { fill: #FFFFFF; font-family: 'Courier New', Monaco, monospace; font-size: 180px; font-weight: bold; }
+      .link-healthy { fill: url(#healthyGrad); stroke: #BDC3C7; stroke-width: 20; filter: url(#dropShadow); }
+      .link-decaying { fill: url(#decayGrad); stroke: #D35400; stroke-width: 20; filter: url(#dropShadow); }
+      .link-dead { fill: url(#deadGrad); stroke: #C0392B; stroke-width: 20; filter: url(#dropShadow); }
+      .particle-large { fill: #E74C3C; filter: url(#softGlow); }
+      .particle-medium { fill: #E67E22; filter: url(#softGlow); }
+      .particle-small { fill: #F39C12; filter: url(#softGlow); }
+      .crack { fill: none; stroke: #C0392B; stroke-width: 8; stroke-linecap: round; }
+      .dust { fill: #95A5A6; opacity: 0.4; }
+      
+      /* Particle falling animations */
+      @keyframes fall1 {
+        0% { transform: translate(0, 50px); opacity: 1; }
+        100% { transform: translate(0, 500px); opacity: 0; }
+      }
+      
+      @keyframes fall2 {
+        0% { transform: translate(0, 50px); opacity: 1; }
+        100% { transform: translate(10px, 520px); opacity: 0; }
+      }
+      
+      @keyframes fall3 {
+        0% { transform: translate(0, 50px); opacity: 1; }
+        100% { transform: translate(-5px, 480px); opacity: 0; }
+      }
+      
+      @keyframes fall4 {
+        0% { transform: translate(0, 50px); opacity: 1; }
+        100% { transform: translate(15px, 510px); opacity: 0; }
+      }
+      
+      @keyframes dustFall {
+        0% { transform: translate(0, 100px); opacity: 0.4; }
+        100% { transform: translate(5px, 450px); opacity: 0; }
+      }
+      
+      /* Glow pulse animation */
+      @keyframes glowPulse {
+        0%, 100% { opacity: 0.6; }
+        50% { opacity: 1; }
+      }
+      
+      /* Break shake animation */
+      @keyframes breakShake {
+        0%, 100% { transform: translate(0, 0); }
+        25% { transform: translate(-2px, 1px); }
+        75% { transform: translate(2px, -1px); }
+      }
+      
+      .break-glow { animation: glowPulse 2s ease-in-out infinite; }
+      .break-lines { animation: breakShake 0.15s ease-in-out infinite; }
+      
+      /* Particle animations - all start simultaneously */
+      .particle-g1 { animation: fall1 3s ease-in 0s infinite; }
+      .particle-g2 { animation: fall2 3.2s ease-in 0s infinite; }
+      .particle-g3 { animation: fall3 2.8s ease-in 0s infinite; }
+      .particle-g4 { animation: fall4 3.1s ease-in 0s infinite; }
+      .particle-g5 { animation: fall1 3.3s ease-in 0s infinite; }
+      .particle-g6 { animation: fall2 2.9s ease-in 0s infinite; }
+      .particle-g7 { animation: fall3 3.4s ease-in 0s infinite; }
+      .particle-g8 { animation: fall4 3s ease-in 0s infinite; }
+      .particle-g9 { animation: fall1 3.2s ease-in 0s infinite; }
+      .particle-g10 { animation: fall2 3.1s ease-in 0s infinite; }
+      
+      .dust-g1 { animation: dustFall 4s ease-in 0s infinite; }
+      .dust-g2 { animation: dustFall 4.2s ease-in 0s infinite; }
+      .dust-g3 { animation: dustFall 3.8s ease-in 0s infinite; }
+      .dust-g4 { animation: dustFall 4.1s ease-in 0s infinite; }
+      .dust-g5 { animation: dustFall 3.9s ease-in 0s infinite; }
+    </style>
+    
+    <!-- Gradient background for hexagon -->
+    <linearGradient id="hexGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#34495E;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#2C3E50;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradient for healthy link -->
+    <linearGradient id="healthyGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ECF0F1;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#BDC3C7;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradient for decaying link with rust texture -->
+    <linearGradient id="decayGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F39C12;stop-opacity:1" />
+      <stop offset="30%" style="stop-color:#E67E22;stop-opacity:1" />
+      <stop offset="60%" style="stop-color:#D35400;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E67E22;stop-opacity:1" />
+    </linearGradient>
+    
+    <!-- Gradient for dead link -->
+    <linearGradient id="deadGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#E74C3C;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#C0392B;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#E74C3C;stop-opacity:0.6" />
+    </linearGradient>
+    
+    <!-- Rust/corrosion pattern -->
+    <pattern id="rustPattern" x="0" y="0" width="40" height="40" patternUnits="userSpaceOnUse">
+      <circle cx="10" cy="10" r="3" fill="#A04000" opacity="0.3"/>
+      <circle cx="25" cy="20" r="2" fill="#8B3A00" opacity="0.4"/>
+      <circle cx="35" cy="5" r="2.5" fill="#A04000" opacity="0.3"/>
+      <circle cx="15" cy="30" r="2" fill="#8B3A00" opacity="0.4"/>
+    </pattern>
+    
+    <!-- Drop shadow filter -->
+    <filter id="dropShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="8"/>
+      <feOffset dx="5" dy="10" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.5"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Red glow for break point -->
+    <filter id="breakGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="15" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Intense glow for pulse -->
+    <filter id="breakGlowIntense" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="25" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Soft glow for particles -->
+    <filter id="softGlow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    
+    <!-- Text shadow -->
+    <filter id="textShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="4"/>
+      <feOffset dx="2" dy="4" result="offsetblur"/>
+      <feComponentTransfer>
+        <feFuncA type="linear" slope="0.6"/>
+      </feComponentTransfer>
+      <feMerge>
+        <feMergeNode/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Hexagon background with gradient -->
+  <path fill="url(#hexGrad)" d="M2443.1,776.1l-178.1-102.9c-252.8-183.2-693.3-408.3-1004.5-579.9-353.4,202.8-724.6,418.3-1007.6,581.6l-175,101.2v1365.6l1182.6,682.8,1182.6-682.8V776.1Z"/>
+  
+  <!-- Left chain link (healthy/intact) -->
+  <g transform="rotate(-35 760 1100)">
+    <rect class="link-healthy" x="660" y="900" width="200" height="400" rx="100"/>
+    <rect fill="#2C3E50" x="710" y="950" width="100" height="300" rx="50"/>
+  </g>
+  
+  <!-- Middle-left chain link (starting to decay) -->
+  <g transform="rotate(-10 1050 1120)">
+    <rect class="link-decaying" x="950" y="920" width="200" height="400" rx="100"/>
+    <!-- Rust texture overlay -->
+    <rect fill="url(#rustPattern)" x="950" y="920" width="200" height="400" rx="100"/>
+    <rect fill="#2C3E50" x="1000" y="970" width="100" height="300" rx="50"/>
+    <!-- Small cracks -->
+    <path class="crack" d="M 1050 920 L 1070 960"/>
+    <path class="crack" d="M 1130 1000 L 1150 1040"/>
+    <path class="crack" d="M 970 1100 L 990 1140" opacity="0.6"/>
+  </g>
+  
+  <!-- Middle-right chain link (heavily decayed) -->
+  <g transform="rotate(15 1380 1150)">
+    <rect class="link-dead" x="1280" y="950" width="200" height="400" rx="100" opacity="0.7"/>
+    <!-- Heavy rust texture -->
+    <rect fill="url(#rustPattern)" x="1280" y="950" width="200" height="400" rx="100" opacity="0.8"/>
+    <rect fill="#2C3E50" x="1330" y="1000" width="100" height="300" rx="50"/>
+    <!-- Major cracks -->
+    <path class="crack" d="M 1300 960 L 1340 1020 M 1350 980 L 1380 1040" stroke-width="12"/>
+    <path class="crack" d="M 1440 1100 L 1470 1160 M 1420 1140 L 1450 1200" stroke-width="12"/>
+    <path class="crack" d="M 1300 1250 L 1340 1300" stroke-width="10"/>
+    <!-- Missing chunks -->
+    <rect fill="#2C3E50" x="1280" y="950" width="60" height="80" rx="30"/>
+    <rect fill="#2C3E50" x="1420" y="1200" width="60" height="80" rx="30"/>
+    <rect fill="#2C3E50" x="1350" y="1280" width="45" height="60" rx="22"/>
+  </g>
+  
+  <!-- Right chain link (completely broken/disintegrating) -->
+  <g transform="rotate(35 1700 1200)" opacity="0.4">
+    <rect class="link-dead" x="1600" y="1000" width="200" height="300" rx="100"/>
+    <rect fill="url(#rustPattern)" x="1600" y="1000" width="200" height="300" rx="100"/>
+    <path class="crack" d="M 1620 1050 L 1780 1250" stroke="#C0392B" stroke-width="15"/>
+  </g>
+  
+  <!-- Break point with pulsing red glow -->
+  <g class="break-glow">
+    <line x1="1150" y1="1100" x2="1300" y2="1200" stroke="#E74C3C" stroke-width="45" stroke-linecap="round"/>
+    <line x1="1160" y1="1120" x2="1310" y2="1220" stroke="#C0392B" stroke-width="35" stroke-linecap="round" opacity="0.7"/>
+  </g>
+  
+  <!-- Break/explosion lines with shake -->
+  <g class="break-lines">
+    <line x1="1180" y1="1150" x2="1120" y2="1300" stroke="#E74C3C" stroke-width="25" stroke-linecap="round" opacity="0.6"/>
+    <line x1="1220" y1="1180" x2="1180" y2="1350" stroke="#E67E22" stroke-width="20" stroke-linecap="round" opacity="0.5"/>
+    <line x1="1260" y1="1200" x2="1250" y2="1380" stroke="#F39C12" stroke-width="18" stroke-linecap="round" opacity="0.4"/>
+  </g>
+  
+  <!-- Falling particles with animations -->
+  <g class="particle-g1">
+    <circle class="particle-large" cx="1150" cy="1380" r="28"/>
+  </g>
+  
+  <g class="particle-g2">
+    <polygon class="particle-large" points="1250,1400 1265,1420 1250,1440 1235,1420"/>
+  </g>
+  
+  <g class="particle-g3">
+    <circle class="particle-medium" cx="1200" cy="1450" r="22"/>
+  </g>
+  
+  <g class="particle-g4">
+    <rect class="particle-large" x="1180" y="1410" width="24" height="24" rx="4" transform="rotate(25 1192 1422)"/>
+  </g>
+  
+  <g class="particle-g5">
+    <circle class="particle-large" cx="1350" cy="1480" r="26"/>
+  </g>
+  
+  <g class="particle-g6">
+    <polygon class="particle-medium" points="1280,1510 1290,1530 1280,1540 1270,1530"/>
+  </g>
+  
+  <g class="particle-g7">
+    <circle class="particle-medium" cx="1400" cy="1540" r="23"/>
+  </g>
+  
+  <g class="particle-g8">
+    <rect class="particle-medium" x="1310" y="1560" width="20" height="20" rx="3" transform="rotate(45 1320 1570)"/>
+  </g>
+  
+  <g class="particle-g9">
+    <circle class="particle-small" cx="1450" cy="1600" r="24"/>
+  </g>
+  
+  <g class="particle-g10">
+    <polygon class="particle-medium" points="1380,1630 1388,1648 1380,1658 1372,1648"/>
+  </g>
+  
+  <!-- Dust particles -->
+  <g class="dust-g1">
+    <circle class="dust" cx="1300" cy="1450" r="6"/>
+  </g>
+  
+  <g class="dust-g2">
+    <circle class="dust" cx="1350" cy="1500" r="5"/>
+  </g>
+  
+  <g class="dust-g3">
+    <circle class="dust" cx="1380" cy="1550" r="7"/>
+  </g>
+  
+  <g class="dust-g4">
+    <circle class="dust" cx="1420" cy="1600" r="4"/>
+  </g>
+  
+  <g class="dust-g5">
+    <circle class="dust" cx="1460" cy="1650" r="6"/>
+  </g>
+  
+  <!-- linkrot text at bottom with shadow and outline -->
+  <text class="st2" x="1260" y="2450" text-anchor="middle" filter="url(#textShadow)" stroke="#1A252F" stroke-width="3">linkrot</text>
+  <text class="st2" x="1260" y="2450" text-anchor="middle">linkrot</text>
+</svg>

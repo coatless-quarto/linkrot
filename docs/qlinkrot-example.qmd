@@ -1,0 +1,113 @@
+---
+title: "Linkrot Example"
+format: html
+filters:
+  - linkrot
+extensions:
+  linkrot:
+    fail-on-error: false
+    timeout: 10
+    # output-file: "linkrot-report.txt" # Write results to file: 
+    skip-patterns:
+      - "example\\.org"  # Skip example.org domains
+    debug: false              # Set to true to see detailed logging
+---
+
+This document provides a demonstration of the `linkrot` extension. 
+
+:::{.callout-note}
+For now, the link reporting only appears in the console output or in a
+a file when rendering the document.
+
+To see the results, render this document using the command line:
+
+```bash
+quarto render docs/qlinkrot-example.qmd
+```
+:::
+
+## Document Configuration
+
+The `linkrot` extension is enabled via the YAML header shown below:
+
+```yaml
+
+title: "Linkrot Example"
+format: html
+filters:
+  - linkrot
+extensions:
+  linkrot:
+    fail-on-error: false
+    timeout: 10
+    # output-file: "linkrot-report.txt" # Write results to file: 
+    skip-patterns:
+      - "example\\.org"  # Skip example.org domains
+    debug: false              # Set to true to see detailed logging
+```
+
+## Usage
+
+When you render this document with `quarto render`, the extension will:
+
+1. Find all external links
+2. Check if they're accessible
+3. Report any broken links in the console
+
+Try adding some broken links and re-rendering to see the checker in action!
+
+## Debug Mode
+
+To see detailed logging of what `linkrot` is doing, enable debug mode:
+
+```yaml
+extensions:
+  linkrot:
+    debug: true
+```
+
+This will show:
+
+- Each URL being checked
+- Curl commands executed
+- Response status codes
+- Cache hits and misses
+- Pattern matching details
+
+## Saving Results
+
+To save results to a file, add the output-file option:
+
+```yaml
+extensions:
+  linkrot:
+    output-file: "linkrot-report.txt"
+```
+
+## Valid Links
+
+Here are some links that should work:
+
+- [Google](https://www.google.com)
+- [GitHub](https://github.com)
+- [Quarto Documentation](https://quarto.org/docs/reference/)
+
+## Broken Links
+
+The following are broken links that linkrot should identify:
+
+- [Broken Link](https://this-domain-definitely-does-not-exist-12345.com)
+- [404 Example](https://httpstat.us/404)
+
+## Internal Links
+
+Internal links are not checked (only external http/https links):
+
+- [Section Link](#valid-links)
+
+## Skipped Links
+
+This link matches our skip pattern and won't be checked:
+
+- [Skipped Example](https://example.org)
+

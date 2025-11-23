@@ -1,0 +1,24 @@
+---
+title: "Release Notes"
+date: "11-10-2025"
+date-modified: last-modified
+engine: markdown
+format: 
+  html:
+    toc: true
+---
+
+# 0.0.0-dev.1: ???? (??-??-????)
+
+## Features
+
+- `linkrot` identifies broken external links in Quarto documents during rendering.
+- Configurable options include:
+  - `fail-on-error`: Whether to fail the build on broken links.
+  - `timeout`: Set the timeout duration for link checks.
+  - `debug`: Enable detailed logging for troubleshooting.
+  - `output-file`: Specify a file to write the link check report.
+  - `skip-patterns`: Define patterns for links to skip during checks.
+- Uses the `curl` command-line tool for robust link checking.
+- Supports both HTTP and HTTPS links.
+

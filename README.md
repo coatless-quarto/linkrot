@@ -1,25 +1,109 @@
-# Quarto Extension Development with Lua in a Devcontainer
+# linkrot <img src="docs/linkrot-animated-logo.svg" align ="right" alt="" width ="150"/>
 
-This repository houses a devcontainer that setups a [Quarto extension development environment](https://quarto.org/docs/extensions/lua.html). The container is setup to work with [GitHub Codespaces](https://github.com/features/codespaces) to instantly have a cloud-based developer workflow.
+A Quarto extension that automatically checks for broken external links in your documents during rendering.
 
-You can try out the Codespace by clicking on the following button:
+## Installation
 
-[![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/coatless-devcontainer/quarto-extension-dev?quickstart=1)
+To install the `linkrot` Quarto extension, follow these steps:
 
-**Note:** Codespaces are available to Students and Teachers for free [up to 180 core hours per month](https://docs.github.com/en/education/manage-coursework-with-github-classroom/integrate-github-classroom-with-an-ide/using-github-codespaces-with-github-classroom#about-github-codespaces) through [GitHub Education](https://education.github.com/). Otherwise, you will have [up to 60 core hours and 15 GB free per month](https://github.com/features/codespaces#pricing).
+1. Open your terminal.
+2. Execute the following command:
 
-The devcontainer contains:
+```sh
+quarto add coatless-quarto/linkrot
+```
 
-- The latest [pre-release](https://quarto.org/docs/download/prerelease) version of Quarto.
-- [Quarto VS Code Extension](https://marketplace.visualstudio.com/items?itemName=quarto.quarto).
-- [Lua LSP VS Code Extension](https://marketplace.visualstudio.com/items?itemName=sumneko.lua) for Lua code intelligence.
-- [GitHub copilot VS Code Extension](https://marketplace.visualstudio.com/items?itemName=GitHub.copilot).
-- `R` and `Python`
-- `knitr` and `jupyter`
+This command will download and install the Quarto extension under the `_extensions` subdirectory of your Quarto project.
+If you are using version control, ensure that you include this directory in your repository.
 
-## References
+### Requirements
 
-- [Quarto: Lua API Reference](https://quarto.org/docs/extensions/lua-api.html)
-- [Quarto: Lua Development](https://quarto.org/docs/extensions/lua.html)
-- [Pandoc: Lua Filters](https://pandoc.org/lua-filters.html)
-- [Lua: Manual](https://www.lua.org/manual/5.4/)
+- Quarto >= 1.7.0
+- `curl` command-line tool:
+  - **Linux/macOS**: Usually pre-installed
+  - **Windows**: Built-in on Windows 10 (1803+) and Windows 11
+  - **Older Windows**: Install [curl for Windows](https://curl.se/windows/) or use Git Bash which includes curl
+
+## Usage
+
+Add the extension to your document's YAML header:
+
+```yaml
+---
+title: "My Document"
+filters:
+  - linkrot
+---
+```
+
+The extension will automatically check all external HTTP/HTTPS links during rendering and report any broken links.
+
+## Configuration
+
+You can configure linkrot's behavior in your document's YAML using the `extensions.linkrot` key:
+
+```yaml
+---
+title: "My Document"
+filters:
+  - linkrot
+extensions:
+  linkrot:
+    fail-on-error: false      # Set to true to fail the build if broken links are found
+    timeout: 10               # Timeout in seconds for each URL check
+    user-agent: "Quarto-Linkrot/1.0"  # User agent string for requests
+    cache-results: true       # Cache results to avoid checking the same URL multiple times
+    debug: false              # Enable debug logging
+    output-file: null         # Write results to a file (e.g., "linkrot-report.txt")
+    skip-patterns:            # List of regex patterns to skip
+      - "example\\.com"
+      - "localhost"
+---
+```
+
+### Configuration Options
+
+#### fail-on-error** (default: `false`)
+
+- If set to `true`, the build will fail if any broken links are detected. Useful for CI/CD pipelines.
+
+#### timeout (default: `10`)
+
+- Maximum time in seconds to wait for each URL to respond.
+
+#### user-agent (default: `"Quarto-Linkrot/1.0"`)
+
+- User agent string sent with HTTP requests.
+
+#### cache-results (default: `true`)
+
+- Cache URL check results to avoid repeatedly checking the same URL in a document.
+
+#### debug (default: `false`)
+
+- Enable debug logging to see detailed information about what linkrot is doing.
+
+#### output-file (default: `null`)
+
+- Path to a file where results will be written. If not specified, results are only shown in the console.
+
+#### skip-patterns
+
+- List of regex patterns. URLs matching any pattern will be skipped (not checked).
+
+## Example Output
+
+When the extension runs, you'll see output like this in the console:
+
+```default
+=== Linkrot Results ===
+Total external links checked: 15
+Broken links found: 2
+
+Broken links:
+  1. [Example Link] https://example.com/broken-page (Status: 404)
+  2. [Another Link] https://nonexistent-site-xyz123.com (Status: timeout/error)
+```
+
+You can also specify an output file to save the results.
+
