@@ -1,0 +1,459 @@
+---
+title: "Frequently Asked Questions"
+date: "11-23-2024"
+date-modified: last-modified
+engine: markdown
+format: 
+  html:
+    toc: true
+---
+
+# General Information
+
+## What is the linkrot extension for Quarto?
+
+The `linkrot` extension for Quarto is a filter that automatically checks all external
+HTTP/HTTPS links in your documents for validity. It uses `curl` to verify that each link
+is accessible and reports any broken links, helping you maintain high-quality documentation
+by catching link rot before publication.
+
+## What types of links does linkrot check?
+
+The `linkrot` extension checks all external links with HTTP or HTTPS schemes, including:
+
+- **Autolinks**: `<https://example.com>`
+- **Inline links**: `[text](https://example.com)`
+- **Reference-style links**: `[text][ref]` with `[ref]: https://example.com`
+
+Internal links (anchors, relative paths) and non-HTTP schemes (mailto:, ftp:, etc.) are not checked.
+
+## Why should I use linkrot?
+
+Link rot is a common problem in documentation where external URLs become invalid over time due to:
+
+- Website restructuring
+- Domain expiration
+- Content removal
+- Server issues
+
+The `linkrot` extension helps you catch these issues during the build process, 
+ensuring your readers don't encounter broken links.
+
+# Installation
+
+## How do I install the linkrot extension?
+
+Install the extension in your Quarto project by running 
+in your terminal:
+
+```bash
+quarto add coatless-quarto/linkrot
+```
+
+## Is the linkrot extension compatible with all Quarto versions?
+
+The `linkrot` extension requires Quarto v1.7.0 or later.
+
+## Do I need to install any additional dependencies?
+
+Yes, you need `curl` to be installed on your system:
+
+- **Windows 10 (1803+) / Windows 11**: Built-in, no action needed
+- **macOS**: Pre-installed
+- **Linux**: Usually pre-installed (if not: `sudo apt install curl`)
+- **Older Windows**: Install from [curl.se/windows](https://curl.se/windows/)
+
+Check if curl is available: `curl --version`
+
+## Does linkrot work on all operating systems?
+
+Yes! The extension automatically detects your operating system (Windows, macOS, Linux)
+and uses the appropriate curl command syntax. This makes it fully cross-platform
+if curl is installed.
+
+# Usage and Customization
+
+## How do I enable the linkrot extension in my document?
+
+After installing the extension, add it to your document's YAML front matter:
+
+```yaml
+---
+title: "My Document"
+filters:
+  - linkrot
+---
+```
+
+The extension will automatically check all external links when you render the document.
+
+## How do I configure linkrot options?
+
+Configure the extension using the `extensions.linkrot` key in your YAML:
+
+```yaml
+---
+filters:
+  - linkrot
+extensions:
+  linkrot:
+    fail-on-error: false
+    timeout: 10
+    debug: false
+    output-file: "linkrot-report.txt"
+---
+```
+
+## Can I make the build fail if broken links are found?
+
+Yes! Set `fail-on-error: true` in your configuration:
+
+```yaml
+extensions:
+  linkrot:
+    fail-on-error: true
+```
+
+This is especially useful in CI/CD pipelines to prevent deployment of documents with broken links.
+
+## Can I skip checking certain URLs?
+
+Yes, use the `skip-patterns` option with regex patterns:
+
+```yaml
+extensions:
+  linkrot:
+    skip-patterns:
+      - "localhost"
+      - "127\\.0\\.0\\.1"
+      - "example\\.com"
+      - "internal\\.company\\.com"
+```
+
+Any URL matching these patterns will be skipped.
+
+## How do I enable debug mode?
+
+Set `debug: true` to see detailed logging:
+
+```yaml
+extensions:
+  linkrot:
+    debug: true
+```
+
+This shows each URL being checked, curl commands executed, response codes, and cache operations.
+
+## Can I save the results to a file?
+
+Yes, use the `output-file` option:
+
+```yaml
+extensions:
+  linkrot:
+    output-file: "linkrot-report.txt"
+```
+
+Results will be written to the specified file in addition to console output.
+
+## What's the default timeout for checking links?
+
+The default timeout is 10 seconds per URL. You can adjust this:
+
+```yaml
+extensions:
+  linkrot:
+    timeout: 30  # Wait up to 30 seconds
+```
+
+## Can I change the user agent string?
+
+Yes, customize the user agent used for HTTP requests:
+
+```yaml
+extensions:
+  linkrot:
+    user-agent: "MyBot/1.0"
+```
+
+This can help if some sites block the default user agent.
+
+# Behavior and Features
+
+## When are links checked during the rendering process?
+
+Links are checked during the Pandoc filter stage, after the document is parsed but before
+format-specific rendering. This means checks happen once regardless of output format.
+
+## Does linkrot check the same URL multiple times?
+
+No, by default linkrot caches results. Each unique URL is checked only once per render,
+even if it appears multiple times in your document. 
+You can disable caching with `cache-results: false`.
+
+## What HTTP status codes are considered "valid"?
+
+Status codes in the 2xx (success) and 3xx (redirect) ranges are considered valid:
+
+- **200-299**: Success (e.g., 200 OK)
+- **300-399**: Redirects (automatically followed)
+
+Status codes 400+ are considered broken:
+
+- **400-499**: Client errors (e.g., 404 Not Found)
+- **500-599**: Server errors
+- **timeout/error**: Network issues
+
+## Does linkrot follow redirects?
+
+Yes, curl is configured with `-L` to follow HTTP redirects automatically. 
+The final destination is checked, not intermediate redirects.
+
+## What happens if my internet connection is down?
+
+All links will be marked as broken with status "timeout/error". 
+The extension requires an active internet connection to check external links.
+
+## Does linkrot affect rendering speed?
+
+Yes, checking links takes time. However:
+
+- Caching prevents redundant checks
+- Checks run in parallel with rendering
+- Most links respond within 1-2 seconds
+- You can increase timeout for slow sites
+
+## Can I use linkrot in CI/CD pipelines?
+
+Yes! This is a primary use case. Configure it to fail builds on broken links:
+
+```yaml
+extensions:
+  linkrot:
+    fail-on-error: true
+    output-file: "linkrot-report.txt"
+```
+
+The build will fail if broken links are found, and the report is saved for review.
+
+## Does linkrot work with all Quarto output formats?
+
+Yes! Since `linkrot` operates at the Pandoc AST level before format-specific rendering, it works with all Quarto output formats including HTML, PDF, Word, EPUB, and more.
+
+## Will linkrot check links in code blocks?
+
+No, linkrot only checks actual link elements in the document AST. URLs that appear as plain text in code blocks are not checked.
+
+## What if a site temporarily blocks my requests?
+
+Some sites implement rate limiting or bot detection. If you encounter this:
+- Use `skip-patterns` to exclude the problematic site
+- Try a different `user-agent` string
+- Increase the `timeout` value
+- Contact the site administrator if it's your own site
+
+
+# Advanced Usage
+
+## How does the caching mechanism work?
+
+Links are cached in memory during a single render. The cache is not persistent across renders.
+Each render starts fresh, but within that render, each unique URL is checked only once.
+
+## Can I generate an HTML report instead of text?
+
+Currently, linkrot outputs plain text reports. To generate HTML, you could:
+
+1. Save results with `output-file`
+2. Post-process the text file to HTML
+
+## Can I customize the report format?
+
+The report format is defined in the code. To customize it, you would need to modify the `build_report()` function in `linkrot.lua`. 
+
+## How do I integrate linkrot with GitHub Actions?
+
+Example GitHub Actions workflow:
+
+```yaml
+name: Check Links
+on: [push, pull_request]
+jobs:
+  check-links:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: quarto-dev/quarto-actions/setup@v2
+      - run: quarto add --no-prompt linkrot
+      - run: quarto render document.qmd
+```
+
+Set `fail-on-error: true` in your document to fail the workflow on broken links.
+
+## Can I use environment variables for configuration?
+
+Not directly, but you can use Quarto's profile system:
+
+Create `_quarto-ci.yml`:
+
+```yaml
+filters:
+  - linkrot
+extensions:
+  linkrot:
+    fail-on-error: true
+```
+
+Then: `quarto render --profile ci`
+
+## Is there a way to check links across my entire Quarto project at once?
+
+Yes! Add the filter to your `_quarto.yml` project file:
+
+```yaml
+project:
+  type: website
+
+filters:
+  - linkrot
+
+extensions:
+  linkrot:
+    fail-on-error: true
+    output-file: "linkrot-report.txt"
+```
+
+This applies linkrot to all documents in your project.
+
+
+# Troubleshooting
+
+## The extension isn't checking my links. What should I do?
+
+First, ensure that:
+
+1. The `linkrot` extension is properly installed in your `_extensions/linkrot/` directory
+2. You've added `filters: [linkrot]` to your document's YAML front matter
+3. Your document contains external HTTP/HTTPS links (not just internal anchors)
+4. `curl` is installed and accessible: run `curl --version`
+5. You have an active internet connection
+
+Enable debug mode to see what's happening:
+
+```yaml
+extensions:
+  linkrot:
+    debug: true
+```
+
+## All my links are being marked as broken
+
+Check these common causes:
+
+**No internet connection**: Ensure you're online
+
+**Firewall/proxy blocking**: Check if your network blocks curl requests
+
+**curl not installed**: Verify with `curl --version`
+
+**Timeout too short**: Increase timeout for slow connections:
+
+```yaml
+extensions:
+  linkrot:
+    timeout: 30
+```
+
+**User agent blocked**: Try a different user agent:
+
+```yaml
+extensions:
+  linkrot:
+    user-agent: "Mozilla/5.0"
+```
+
+## I get "curl is not recognized" on Windows
+
+This means curl isn't in your PATH. Solutions:
+
+1. **Windows 10 1803+ / Windows 11**: curl should be built-in. Restart your terminal.
+2. **Older Windows**: Install curl from [curl.se/windows](https://curl.se/windows/)
+3. Add curl to your system PATH
+4. Or use Git Bash which includes curl
+
+## Links are timing out but they work in my browser
+
+This usually indicates:
+
+- Slow server response
+- Geographic restrictions
+- Rate limiting
+
+Solutions:
+
+- Increase the timeout value
+- Use `skip-patterns` for consistently slow sites
+- Check if the site has rate limiting
+
+## How do I debug pattern matching for skip-patterns?
+
+Enable debug mode to see which patterns are matching:
+
+```yaml
+extensions:
+  linkrot:
+    debug: true
+    skip-patterns:
+      - "example\\.com"
+```
+
+Debug output will show: `[linkrot] Skipping URL (matches pattern 'example\.com'): https://example.com`
+
+Remember to escape dots: `example\\.com` not `example.com`
+
+## Can I see the actual curl commands being executed?
+
+Yes! Enable debug mode:
+
+```yaml
+extensions:
+  linkrot:
+    debug: true
+```
+
+Debug output includes the full curl command, e.g.:
+
+```default
+[linkrot] Executing command: curl -s -o /dev/null -w "%{http_code}" ...
+```
+
+## The extension is very slow
+
+This can happen with many links or slow sites. Solutions:
+
+**Enable caching** (default):
+
+```yaml
+extensions:
+  linkrot:
+    cache-results: true
+```
+
+**Skip slow domains**:
+
+```yaml
+extensions:
+  linkrot:
+    skip-patterns:
+      - "slow-site\\.com"
+```
+
+**Reduce timeout**:
+
+```yaml
+extensions:
+  linkrot:
+    timeout: 5
+```
+
+**Check fewer links**: Consider running link checks less frequently in development.
