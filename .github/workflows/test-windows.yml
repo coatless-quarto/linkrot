@@ -1,0 +1,59 @@
+name: Test Extension (Windows)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+jobs:
+  test-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Quarto
+        uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          version: "pre-release"
+
+      - name: Create test document
+        shell: bash
+        run: |
+          mkdir -p test
+          cp -r _extensions test/
+          cat > test/test.qmd << 'EOF'
+          ---
+          title: "Linkrot Windows Test"
+          format: html
+          filters:
+            - linkrot
+          extensions:
+            linkrot:
+              fail-on-error: true
+              timeout: 15
+              debug: true
+          ---
+
+          ## Test Links
+
+          These links should be valid:
+
+          - [Google](https://www.google.com)
+          - [GitHub](https://github.com)
+          EOF
+
+      - name: Render test document
+        run: quarto render test/test.qmd
+
+      - name: Verify output exists
+        shell: bash
+        run: |
+          if [ -f "test/test.html" ]; then
+            echo "Test passed: HTML output generated successfully"
+          else
+            echo "Test failed: No HTML output found"
+            exit 1
+          fi
