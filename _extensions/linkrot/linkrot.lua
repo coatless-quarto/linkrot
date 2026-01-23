@@ -145,7 +145,7 @@ end
 local function build_windows_curl_command(url)
   local escaped_url = url:gsub('"', '""')
   return string.format(
-    'curl.exe -s -o NUL -w "%%%%{http_code}" -L --max-time %d -A "%s" "%s" 2>NUL',
+    'curl.exe -s -o NUL -w "%%{http_code}" -L --max-time %d -A "%s" "%s" 2>NUL',
     config.timeout,
     config.user_agent,
     escaped_url
