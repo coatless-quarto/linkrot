@@ -267,7 +267,20 @@ end
 -- REPORT
 -- ============================================================================
 
---- Build the report: the totals, then each broken link or "All links are valid!".
+--- The document's path relative to the project directory, or its file name
+--- when it is not part of a project.
+---@return string
+local function document_name()
+  local input = quarto.doc.input_file
+  local project_dir = quarto.project and quarto.project.directory
+  if project_dir then
+    return (pandoc.path.make_relative(input, project_dir):gsub("\\", "/"))
+  end
+  return pandoc.path.filename(input)
+end
+
+--- Build the report: the totals, then each broken link under a heading naming
+--- the document, or "All links are valid!".
 ---@return string[] lines
 local function build_report()
   local broken = state.broken_links
@@ -280,7 +293,7 @@ local function build_report()
 
   if #broken > 0 then
     table.insert(report, "")
-    table.insert(report, "Broken links:")
+    table.insert(report, "Broken links in " .. document_name() .. ":")
     for i, link in ipairs(broken) do
       table.insert(report, string.format("  %d. [%s] %s (Status: %s)",
         i, link.text, link.url, link.status))
