@@ -9,7 +9,7 @@ extensions:
     timeout: 10
     # output-file: "linkrot-report.txt" # Write results to file: 
     skip-patterns:
-      - "example\\.org"  # Skip example.org domains
+      - "example%.org"  # Skip example.org domains
     debug: false              # Set to true to see detailed logging
 ---
 
@@ -42,7 +42,7 @@ extensions:
     timeout: 10
     # output-file: "linkrot-report.txt" # Write results to file: 
     skip-patterns:
-      - "example\\.org"  # Skip example.org domains
+      - "example%.org"  # Skip example.org domains
     debug: false              # Set to true to see detailed logging
 ```
 

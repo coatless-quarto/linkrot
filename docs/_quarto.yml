@@ -17,7 +17,7 @@ website:
     contents: 
       - text: "Home"
         file: index.qmd
-      - section: "Support"
+      - section: "Demos"
         contents:
         - text: "Demo"
           href: qlinkrot-example.qmd

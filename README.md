@@ -55,15 +55,15 @@ extensions:
     cache-results: true       # Cache results to avoid checking the same URL multiple times
     debug: false              # Enable debug logging
     output-file: null         # Write results to a file (e.g., "linkrot-report.txt")
-    skip-patterns:            # List of regex patterns to skip
-      - "example\\.com"
+    skip-patterns:            # List of Lua patterns to skip
+      - "example%.com"
       - "localhost"
 ---
 ```
 
 ### Configuration Options
 
-#### fail-on-error** (default: `false`)
+#### fail-on-error (default: `false`)
 
 - If set to `true`, the build will fail if any broken links are detected. Useful for CI/CD pipelines.
 
@@ -89,7 +89,8 @@ extensions:
 
 #### skip-patterns
 
-- List of regex patterns. URLs matching any pattern will be skipped (not checked).
+- List of [Lua patterns](https://www.lua.org/manual/5.4/manual.html#6.4.1), not regular expressions. URLs matching any pattern will be skipped (not checked).
+- Escape special characters such as `.` and `-` with `%`, as in `example%.com`. A backslash does not work: metadata is read as Markdown, so `example\\.com` reaches linkrot as `example.com`.
 
 ## Example Output
 
@@ -102,7 +103,7 @@ Broken links found: 2
 
 Broken links:
   1. [Example Link] https://example.com/broken-page (Status: 404)
-  2. [Another Link] https://nonexistent-site-xyz123.com (Status: timeout/error)
+  2. [Another Link] https://nonexistent-site-xyz123.com (Status: unavailable)
 ```
 
 You can also specify an output file to save the results.
