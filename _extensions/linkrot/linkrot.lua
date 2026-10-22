@@ -1,102 +1,191 @@
 -- ============================================================================
--- STATE MANAGEMENT
+-- TYPES
 -- ============================================================================
 
---- State container for link checking process.
--- @class table
--- @name state
--- @field broken_links Array of broken link records
--- @field checked_urls Cache of URL check results
--- @field check_count Total number of external links checked
--- @field broken_count Number of broken links found
+---@class LinkrotConfig
+---@field fail_on_error boolean `fail-on-error`: stop the render with exit status 1 if a link is broken
+---@field timeout number `timeout`: seconds to wait for each URL (curl's --max-time)
+---@field user_agent string `user-agent`: User-Agent header sent with each request
+---@field cache_results boolean `cache-results`: check each unique URL only once
+---@field debug boolean `debug`: log each step to the console
+---@field output_file string|nil `output-file`: also write the report to this file
+---@field skip_patterns string[] `skip-patterns`: Lua patterns for URLs that are not checked
+
+---@alias LinkrotOptionKind "boolean"|"number"|"string"|"list"
+
+---@class LinkrotOption
+---@field key string Key under `extensions.linkrot`
+---@field field string Matching field in `LinkrotConfig`
+---@field kind LinkrotOptionKind How the metadata value is read
+
+---@class BrokenLink
+---@field url string
+---@field text string Link text
+---@field status integer|string HTTP status code, or "unavailable" if there was no response
+
+---@class CachedResult
+---@field valid boolean
+---@field status integer|string|nil HTTP status code, "unavailable", or nil for a skipped URL
+
+---@class LinkrotState
+---@field broken_links BrokenLink[] Broken links, in document order
+---@field checked_urls table<string, CachedResult> Results by URL, if `cache-results` is on
+---@field check_count integer Number of external links checked
+
+---@class CurlTemplate
+---@field command string Format string taking the timeout, user agent and URL
+---@field quote fun(value: string): string Quotes a value for the platform's shell
+
+-- ============================================================================
+-- STATE AND CONFIGURATION
+-- ============================================================================
+
+---@type LinkrotState
 local state = {
   broken_links = {},
   checked_urls = {},
-  check_count = 0,
-  broken_count = 0
+  check_count = 0
 }
 
--- ============================================================================
--- CONFIGURATION
--- ============================================================================
-
---- Configuration options with defaults.
--- @class table
--- @name config
--- @field fail_on_error Whether to fail build if broken links are found
--- @field timeout Timeout in seconds for HTTP requests
--- @field user_agent User agent string for HTTP requests
--- @field skip_patterns Array of regex patterns for URLs to skip
--- @field cache_results Whether to cache URL check results
--- @field debug Enable debug logging
--- @field output_file Optional file path for report output
+--- Configuration from `extensions.linkrot`, filled in by `read_config`.
+---@type LinkrotConfig
 local config = {
   fail_on_error = false,
   timeout = 10,
   user_agent = "Quarto-Linkrot/1.0",
-  skip_patterns = {},
   cache_results = true,
   debug = false,
-  output_file = nil
+  output_file = nil,
+  skip_patterns = {}
 }
 
+--- Options read from `extensions.linkrot`, in the order the debug log lists them.
+---@type LinkrotOption[]
+local options = {
+  { key = "fail-on-error", field = "fail_on_error", kind = "boolean" },
+  { key = "timeout",       field = "timeout",       kind = "number" },
+  { key = "user-agent",    field = "user_agent",    kind = "string" },
+  { key = "cache-results", field = "cache_results", kind = "boolean" },
+  { key = "debug",         field = "debug",         kind = "boolean" },
+  { key = "output-file",   field = "output_file",   kind = "string" },
+  { key = "skip-patterns", field = "skip_patterns", kind = "list" }
+}
+
+--- curl command and quoting for each platform. The URL and user agent are
+--- quoted so the shell passes them to curl literally.
+---@type table<string, CurlTemplate>
+local curl_templates = {
+  windows = {
+    command = 'curl.exe -s -o NUL -w "%%{http_code}" -L --max-time %g -A %s %s 2>NUL',
+    quote = function(value)
+      return '"' .. value:gsub('"', '""') .. '"'
+    end
+  },
+  posix = {
+    -- Single quotes stop $(...), backticks and variables; ' is written as '\''
+    command = 'curl -s -o /dev/null -w "%%{http_code}" -L --max-time %g -A %s %s 2>/dev/null',
+    quote = function(value)
+      return "'" .. value:gsub("'", "'\\''") .. "'"
+    end
+  }
+}
+
+local curl = package.config:sub(1, 1) == "\\" and curl_templates.windows or curl_templates.posix
+
 -- ============================================================================
--- LOGGING UTILITIES
+-- LOGGING
 -- ============================================================================
 
---- Log a debug message if debug mode is enabled.
--- Messages are prefixed with "[linkrot]" and output via quarto.log.output().
--- @param message The message to log
--- @usage debug_log("Checking URL: " .. url)
+--- Log a debug message prefixed with "[linkrot]" if debug mode is enabled.
+---@param message string
 local function debug_log(message)
   if config.debug then
     quarto.log.output("[linkrot] " .. message)
   end
 end
 
---- Log all configuration values for debugging.
--- Outputs fail-on-error, timeout, user-agent, cache-results, debug,
--- output-file, and skip-patterns count.
--- @see config
-local function log_configuration()
+-- ============================================================================
+-- CONFIGURATION LOADING
+-- ============================================================================
+
+--- Stringify a metadata value, ignoring values that are absent or blank.
+---@param value any Metadata value
+---@return string|nil text
+local function read_text(value)
+  if not value then
+    return nil
+  end
+  local text = pandoc.utils.stringify(value)
+  if text:match("%S") then
+    return text
+  end
+  return nil
+end
+
+--- Readers for each option kind. Each returns nil to keep the default.
+---@type table<LinkrotOptionKind, fun(value: any): any>
+local readers = {
+  -- Any value other than `false` turns the option on
+  boolean = function(value)
+    return value ~= false
+  end,
+  number = function(value)
+    return tonumber(pandoc.utils.stringify(value))
+  end,
+  string = read_text,
+  list = function(value)
+    if type(value) ~= "table" then
+      return nil
+    end
+    local items = {}
+    for _, item in ipairs(value) do
+      local text = read_text(item)
+      if text then
+        table.insert(items, text)
+      end
+    end
+    return items
+  end
+}
+
+--- Read `extensions.linkrot` from the document metadata into `config`.
+---@param meta pandoc.Meta
+local function read_config(meta)
+  local extensions = meta.extensions
+  local opts = type(extensions) == "table" and extensions.linkrot or nil
+  if type(opts) ~= "table" then
+    return
+  end
+
+  for _, option in ipairs(options) do
+    local value = opts[option.key]
+    if value ~= nil then
+      local parsed = readers[option.kind](value)
+      if parsed ~= nil then
+        config[option.field] = parsed
+      end
+    end
+  end
+
   debug_log("Configuration loaded:")
-  debug_log("  fail-on-error: " .. tostring(config.fail_on_error))
-  debug_log("  timeout: " .. tostring(config.timeout))
-  debug_log("  user-agent: " .. config.user_agent)
-  debug_log("  cache-results: " .. tostring(config.cache_results))
-  debug_log("  debug: " .. tostring(config.debug))
-  debug_log("  output-file: " .. tostring(config.output_file or "none"))
-  debug_log("  skip-patterns: " .. #config.skip_patterns .. " pattern(s)")
+  for _, option in ipairs(options) do
+    local value = config[option.field]
+    if option.kind == "list" then
+      value = #value .. " pattern(s)"
+    elseif value == nil then
+      value = "none"
+    end
+    debug_log("  " .. option.key .. ": " .. tostring(value))
+  end
 end
 
 -- ============================================================================
--- PLATFORM DETECTION
+-- URL CHECKING
 -- ============================================================================
 
---- Detect if running on Windows operating system.
--- Uses package.config to determine directory separator.
--- @return true if Windows, false otherwise
-local function is_windows()
-  return package.config:sub(1,1) == '\\'
-end
-
--- ============================================================================
--- URL UTILITIES
--- ============================================================================
-
---- Check if a URL is external (http or https).
--- @param url The URL to check
--- @return true if URL starts with http:// or https://, false otherwise
--- @usage if is_external_link(url) then check_url(url) end
-local function is_external_link(url)
-  return url:match("^https?://") ~= nil
-end
-
---- Check if a URL should be skipped based on configured patterns.
--- Matches the URL against all patterns in config.skip_patterns.
--- @param url The URL to check
--- @return true if URL matches any skip pattern, false otherwise
--- @see config.skip_patterns
+--- Check whether a URL matches any of the `skip-patterns`.
+---@param url string
+---@return boolean
 local function should_skip_url(url)
   for _, pattern in ipairs(config.skip_patterns) do
     if string.match(url, pattern) then
@@ -107,556 +196,172 @@ local function should_skip_url(url)
   return false
 end
 
---- Get cached result for a URL if caching is enabled.
--- @param url The URL to look up
--- @return cached_result The cached { valid, status } record, or nil if not cached
--- @return was_cached true if result was found in cache, false otherwise
--- @see state.checked_urls
-local function get_cached_result(url)
-  local cached = state.checked_urls[url]
-  if config.cache_results and cached ~= nil then
-    debug_log("Using cached result for: " .. url .. " (valid: " .. tostring(cached.valid) ..
-      ", status: " .. tostring(cached.status) .. ")")
-    return cached, true
-  end
-  return nil, false
-end
-
---- Cache the result of a URL check.
--- Only caches if config.cache_results is true.
--- @param url The URL that was checked
--- @param is_valid Whether the URL is valid (true) or broken (false)
--- @param status The HTTP status code or error message, if any
--- @see state.checked_urls
--- @see config.cache_results
-local function cache_result(url, is_valid, status)
-  if config.cache_results then
-    state.checked_urls[url] = { valid = is_valid, status = status }
-  end
-end
-
--- ============================================================================
--- CURL COMMAND GENERATION
--- ============================================================================
-
---- Build curl command for Windows platform.
--- Uses curl.exe with Windows-specific paths and escaping.
--- @param url The URL to check
--- @return The complete curl command string for Windows
--- @see config.timeout
--- @see config.user_agent
-local function build_windows_curl_command(url)
-  local escaped_url = url:gsub('"', '""')
-  local escaped_user_agent = config.user_agent:gsub('"', '""')
-  return string.format(
-    'curl.exe -s -o NUL -w "%%{http_code}" -L --max-time %g -A "%s" "%s" 2>NUL',
-    config.timeout,
-    escaped_user_agent,
-    escaped_url
-  )
-end
-
---- Quote a value for a POSIX shell so it is passed to curl literally.
--- Wraps the value in single quotes and writes each embedded single
--- quote as '\'' so $(...), backticks and variables are not expanded.
--- @param value The string to quote
--- @return The single-quoted string
-local function posix_quote(value)
-  return "'" .. value:gsub("'", "'\\''") .. "'"
-end
-
---- Build curl command for Unix/Linux/macOS platforms.
--- Uses standard curl with Unix-specific paths and escaping.
--- @param url The URL to check
--- @return The complete curl command string for Unix-like systems
--- @see config.timeout
--- @see config.user_agent
-local function build_unix_curl_command(url)
-  return string.format(
-    'curl -s -o /dev/null -w "%%{http_code}" -L --max-time %g -A %s %s 2>/dev/null',
-    config.timeout,
-    posix_quote(config.user_agent),
-    posix_quote(url)
-  )
-end
-
---- Build appropriate curl command for the current platform.
--- Automatically detects the platform and calls the appropriate builder.
--- @param url The URL to check
--- @return The complete curl command string for the current platform
--- @see build_windows_curl_command
--- @see build_unix_curl_command
--- @see is_windows
-local function build_curl_command(url)
-  if is_windows() then
-    return build_windows_curl_command(url)
-  else
-    return build_unix_curl_command(url)
-  end
-end
-
--- ============================================================================
--- URL CHECKING
--- ============================================================================
-
---- Execute curl command and extract HTTP status code.
--- @param cmd The curl command to execute
--- @return The HTTP status code as a number, or nil if curl failed
-local function execute_curl(cmd)
+--- Run curl on a URL and return the HTTP status code it reports.
+---@param url string
+---@return integer|nil status_code The status code, or nil if curl gave no output
+local function run_curl(url)
+  local cmd = string.format(curl.command, config.timeout, curl.quote(config.user_agent), curl.quote(url))
   debug_log("Executing command: " .. cmd)
-  
+
+  local status_code = nil
   local handle = io.popen(cmd)
-  local result = handle:read("*a")
-  local success = handle:close()
-  
-  local status_code = tonumber(result)
+  if handle then
+    status_code = tonumber(handle:read("a"))
+    handle:close()
+  end
+
   debug_log("Curl response: " .. (status_code and tostring(status_code) or "no response"))
-  
   return status_code
 end
 
---- Validate HTTP status code.
--- Status codes in the 2xx and 3xx ranges are considered valid.
--- @param status_code The HTTP status code to validate
--- @return true if status code indicates success (200-399), false otherwise
-local function is_valid_status_code(status_code)
-  return status_code and status_code >= 200 and status_code < 400
-end
-
---- Check if a URL is accessible via HTTP request.
--- Builds and executes a curl command, then validates the response.
--- @param url The URL to check
--- @return is_valid true if URL is accessible, false if broken
--- @return status_code The HTTP status code, or "unavailable" if request failed
--- @see build_curl_command
--- @see execute_curl
--- @see is_valid_status_code
+--- Request a URL. Status codes from 200 to 399 count as valid.
+---@param url string
+---@return boolean is_valid
+---@return integer|string status The HTTP status code, or "unavailable" if there was no response
 local function check_url_accessibility(url)
-  local cmd = build_curl_command(url)
-  local status_code = execute_curl(cmd)
-  
+  local status_code = run_curl(url)
+
   if not status_code or status_code == 0 then
     debug_log("URL check failed (no valid response): " .. url)
     return false, "unavailable"
   end
-  
-  local is_valid = is_valid_status_code(status_code)
+
+  local is_valid = status_code >= 200 and status_code < 400
   debug_log("URL " .. url .. " is " .. (is_valid and "valid" or "broken") .. " (status: " .. status_code .. ")")
-  
-  return is_valid, status_code
-end
-
---- Main URL checking function with caching and skip logic.
--- Checks cache first, then skip patterns, then performs actual HTTP check.
--- Results are cached if caching is enabled.
--- @param url The URL to check
--- @return is_valid true if URL is valid or skipped, false if broken
--- @return status_code The HTTP status code, or nil if skipped
--- @return was_cached true if the result came from the cache
--- @see get_cached_result
--- @see should_skip_url
--- @see check_url_accessibility
--- @see cache_result
--- @usage local is_valid, status = check_url("https://example.com")
-local function check_url(url)
-  -- Check cache first
-  local cached_result, was_cached = get_cached_result(url)
-  if was_cached then
-    return cached_result.valid, cached_result.status, true
-  end
-
-  -- Check if we should skip this URL
-  if should_skip_url(url) then
-    cache_result(url, true)
-    return true
-  end
-
-  debug_log("Checking URL: " .. url)
-
-  -- Perform actual check
-  local is_valid, status_code = check_url_accessibility(url)
-
-  -- Cache the result
-  cache_result(url, is_valid, status_code)
 
   return is_valid, status_code
 end
 
--- ============================================================================
--- LINK TRACKING
--- ============================================================================
-
---- Record a broken link in the state.
--- Increments broken_count and adds link details to broken_links array.
--- @param url The broken URL
--- @param text The link text/anchor text
--- @param status The HTTP status code or error message
--- @see state.broken_links
--- @see state.broken_count
-local function add_broken_link(url, text, status)
-  state.broken_count = state.broken_count + 1
-  debug_log("Adding to broken links: " .. url)
-  
-  table.insert(state.broken_links, {
-    url = url,
-    text = text,
-    status = status or "timeout/error"
-  })
-end
-
---- Process and check a single link.
--- Increments check_count, validates the URL, and records if broken.
--- A URL answered from the cache was already counted and recorded,
--- so it is not counted or listed again.
--- @param url The URL to check
--- @param link_text The anchor text of the link
--- @see check_url
--- @see add_broken_link
--- @see state.check_count
-local function process_link(url, link_text)
-  local is_valid, status_code, was_cached = check_url(url)
-
-  if was_cached then
+--- Check one external link and record it if it is broken. A URL found in
+--- the cache was counted and recorded the first time, so it is skipped.
+---@param url string
+---@param text string Link text
+local function process_link(url, text)
+  local cached = state.checked_urls[url]
+  if cached then
+    debug_log("Using cached result for: " .. url .. " (valid: " .. tostring(cached.valid) ..
+      ", status: " .. tostring(cached.status) .. ")")
     return
+  end
+
+  ---@type boolean, integer|string|nil
+  local is_valid, status = true, nil
+  if not should_skip_url(url) then
+    debug_log("Checking URL: " .. url)
+    is_valid, status = check_url_accessibility(url)
+  end
+
+  if config.cache_results then
+    state.checked_urls[url] = { valid = is_valid, status = status }
   end
 
   state.check_count = state.check_count + 1
 
   if not is_valid then
-    add_broken_link(url, link_text, status_code)
+    debug_log("Adding to broken links: " .. url)
+    table.insert(state.broken_links, { url = url, text = text, status = status })
   end
 end
 
 -- ============================================================================
--- REPORT GENERATION
+-- REPORT
 -- ============================================================================
 
---- Build the report header with statistics.
--- @return Array of header lines
--- @see state.check_count
--- @see state.broken_count
-local function build_report_header()
-  local header = {}
-  table.insert(header, "")
-  table.insert(header, "=== Linkrot Results ===")
-  table.insert(header, string.format("Total external links checked: %d", state.check_count))
-  table.insert(header, string.format("Broken links found: %d", state.broken_count))
-  return header
-end
+--- Build the report: the totals, then each broken link or "All links are valid!".
+---@return string[] lines
+local function build_report()
+  local broken = state.broken_links
+  local report = {
+    "",
+    "=== Linkrot Results ===",
+    string.format("Total external links checked: %d", state.check_count),
+    string.format("Broken links found: %d", #broken)
+  }
 
---- Build the broken links section of the report.
--- Lists all broken links with their text and status codes.
--- @return Array of report lines for broken links section
--- @see state.broken_links
--- @see state.broken_count
-local function build_broken_links_section()
-  local section = {}
-  
-  if state.broken_count > 0 then
-    table.insert(section, "")
-    table.insert(section, "Broken links:")
-    for i, link in ipairs(state.broken_links) do
-      table.insert(section, string.format("  %d. [%s] %s (Status: %s)", 
+  if #broken > 0 then
+    table.insert(report, "")
+    table.insert(report, "Broken links:")
+    for i, link in ipairs(broken) do
+      table.insert(report, string.format("  %d. [%s] %s (Status: %s)",
         i, link.text, link.url, link.status))
     end
-    table.insert(section, "")
   else
-    table.insert(section, "All links are valid!")
-    table.insert(section, "")
+    table.insert(report, "All links are valid!")
   end
-  
-  return section
-end
+  table.insert(report, "")
 
---- Build the complete linkrot report.
--- Combines header and broken links sections.
--- @return Array of all report lines
--- @see build_report_header
--- @see build_broken_links_section
-local function build_report()
-  local report = {}
-  
-  -- Add header
-  for _, line in ipairs(build_report_header()) do
-    table.insert(report, line)
-  end
-  
-  -- Add broken links section
-  for _, line in ipairs(build_broken_links_section()) do
-    table.insert(report, line)
-  end
-  
   return report
 end
 
--- ============================================================================
--- OUTPUT HANDLING
--- ============================================================================
-
---- Output report to console using quarto.log.output().
--- @param report Array of report lines to output
-local function output_to_console(report)
-  for _, line in ipairs(report) do
-    quarto.log.output(line)
-  end
-end
-
---- Write report to a file.
--- Creates or overwrites the specified file with the report contents.
--- @param report Array of report lines to write
--- @param filepath Path to the output file
--- @return true if successful, false if file could not be written
+--- Write the report to a file, replacing its contents.
+---@param report string[]
+---@param filepath string
 local function write_report_to_file(report, filepath)
   debug_log("Writing results to file: " .. filepath)
-  
+
   local file, err = io.open(filepath, "w")
   if not file then
     quarto.log.output("Error: Could not write to file " .. filepath .. ": " .. tostring(err))
     debug_log("Failed to write results to file: " .. tostring(err))
-    return false
+    return
   end
-  
-  for _, line in ipairs(report) do
-    file:write(line .. "\n")
-  end
+
+  file:write(table.concat(report, "\n"), "\n")
   file:close()
-  
+
   quarto.log.output("Results written to: " .. filepath)
   debug_log("Successfully wrote results to file")
-  return true
-end
-
---- Output report to all configured destinations.
--- Always outputs to console. If output_file is configured, also writes to file.
--- @param report Array of report lines to output
--- @see output_to_console
--- @see write_report_to_file
--- @see config.output_file
-local function output_report(report)
-  -- Always output to console
-  output_to_console(report)
-  
-  -- Write to file if configured
-  if config.output_file and config.output_file ~= "" then
-    write_report_to_file(report, config.output_file)
-  end
-end
-
--- ============================================================================
--- BUILD CONTROL
--- ============================================================================
-
---- Handle build failure if configured.
--- Stops the render with exit status 1 if broken links were found
--- and fail_on_error is enabled. Quarto's error() only logs, so the
--- process is exited directly.
--- @see state.broken_count
--- @see config.fail_on_error
-local function handle_build_failure()
-  if state.broken_count > 0 and config.fail_on_error then
-    debug_log("Failing build due to broken links")
-    quarto.log.error("Build failed: broken links detected")
-    os.exit(1)
-  end
-end
-
--- ============================================================================
--- CONFIGURATION LOADING
--- ============================================================================
-
---- Validate and parse a string value from metadata.
--- Returns nil if value is empty or contains only whitespace.
--- @param value The metadata value to parse
--- @return The parsed string, or nil if invalid/empty
-local function parse_string_value(value)
-  if not value then
-    return nil
-  end
-  
-  local str = pandoc.utils.stringify(value)
-  -- Only return if not empty and contains non-whitespace
-  if str and str:match("%S") then
-    return str
-  end
-  
-  return nil
-end
-
---- Load fail-on-error configuration setting.
--- @param lr The linkrot configuration table from metadata
--- @see config.fail_on_error
-local function load_fail_on_error(lr)
-  if lr["fail-on-error"] ~= nil then
-    config.fail_on_error = lr["fail-on-error"]
-  end
-end
-
---- Load timeout configuration setting.
--- Converts to number and validates before setting.
--- @param lr The linkrot configuration table from metadata
--- @see config.timeout
-local function load_timeout(lr)
-  if lr.timeout then
-    local timeout = tonumber(pandoc.utils.stringify(lr.timeout))
-    if timeout then
-      config.timeout = timeout
-    end
-  end
-end
-
---- Load user-agent configuration setting.
--- @param lr The linkrot configuration table from metadata
--- @see config.user_agent
-local function load_user_agent(lr)
-  if lr["user-agent"] then
-    local user_agent = parse_string_value(lr["user-agent"])
-    if user_agent then
-      config.user_agent = user_agent
-    end
-  end
-end
-
---- Load skip-patterns configuration setting.
--- Parses array of regex patterns for URLs to skip.
--- @param lr The linkrot configuration table from metadata
--- @see config.skip_patterns
-local function load_skip_patterns(lr)
-  if lr["skip-patterns"] then
-    config.skip_patterns = {}
-    for _, pattern in ipairs(lr["skip-patterns"]) do
-      local pattern_str = parse_string_value(pattern)
-      if pattern_str then
-        table.insert(config.skip_patterns, pattern_str)
-      end
-    end
-  end
-end
-
---- Load cache-results configuration setting.
--- @param lr The linkrot configuration table from metadata
--- @see config.cache_results
-local function load_cache_results(lr)
-  if lr["cache-results"] ~= nil then
-    config.cache_results = lr["cache-results"]
-  end
-end
-
---- Load debug configuration setting.
--- @param lr The linkrot configuration table from metadata
--- @see config.debug
-local function load_debug(lr)
-  if lr.debug ~= nil then
-    config.debug = lr.debug
-  end
-end
-
---- Load output-file configuration setting.
--- Validates that the file path is not empty before setting.
--- @param lr The linkrot configuration table from metadata
--- @see config.output_file
-local function load_output_file(lr)
-  if lr["output-file"] then
-    local output_file = parse_string_value(lr["output-file"])
-    if output_file then
-      config.output_file = output_file
-    end
-  end
-end
-
---- Load all configuration options from metadata.
--- Orchestrates loading of all individual configuration settings.
--- @param lr The linkrot configuration table from metadata
--- @see load_fail_on_error
--- @see load_timeout
--- @see load_user_agent
--- @see load_skip_patterns
--- @see load_cache_results
--- @see load_debug
--- @see load_output_file
-local function load_configuration(lr)
-  load_fail_on_error(lr)
-  load_timeout(lr)
-  load_user_agent(lr)
-  load_skip_patterns(lr)
-  load_cache_results(lr)
-  load_debug(lr)
-  load_output_file(lr)
 end
 
 -- ============================================================================
 -- PANDOC FILTER FUNCTIONS
 -- ============================================================================
 
---- Process Link elements in the document.
--- Checks if link is external, and if so, validates it and tracks the result.
--- This function is called by Pandoc for each Link element in the AST.
--- @param el The Pandoc Link element
--- @return The unmodified Link element
--- @see is_external_link
--- @see process_link
-function Link(el)
-  local url = el.target
-  
-  if is_external_link(url) then
+--- Check a Link element if it points to an external http(s) URL.
+---@param link pandoc.Link
+local function check_link(link)
+  local url = link.target
+
+  if url:match("^https?://") then
     debug_log("Found external link: " .. url)
-    local link_text = pandoc.utils.stringify(el.content)
-    process_link(url, link_text)
+    process_link(url, pandoc.utils.stringify(link.content))
   else
     debug_log("Skipping non-external link: " .. url)
   end
-  
-  return el
 end
 
---- Process document metadata and load configuration.
--- Reads configuration from extensions.linkrot key in metadata.
--- This function is called by Pandoc before processing the document.
--- @param meta The Pandoc Meta element containing document metadata
--- @return The unmodified Meta element
--- @see load_configuration
--- @see log_configuration
-function Meta(meta)
-  -- Read from extensions.linkrot path
-  if meta.extensions and meta.extensions.linkrot then
-    load_configuration(meta.extensions.linkrot)
-    log_configuration()
-  end
-  
-  return meta
-end
-
---- Process complete document and generate final report.
--- Builds and outputs the report, handles file writing, and triggers
--- build failure if configured. This function is called by Pandoc after
--- all links have been processed.
--- @param doc The complete Pandoc document
--- @return The unmodified document
--- @see build_report
--- @see output_report
--- @see handle_build_failure
-function Pandoc(doc)
-  if state.check_count > 0 then
-    debug_log("Generating results report...")
-    
-    local report = build_report()
-    output_report(report)
-    handle_build_failure()
-  else
+--- Print the report, write it to `output-file` if set, and stop the render
+--- if `fail-on-error` is on and a link is broken.
+local function report_results()
+  if state.check_count == 0 then
     debug_log("No external links found to check")
+    return
   end
-  
-  return doc
+
+  debug_log("Generating results report...")
+  local report = build_report()
+  for _, line in ipairs(report) do
+    quarto.log.output(line)
+  end
+  if config.output_file then
+    write_report_to_file(report, config.output_file)
+  end
+
+  if #state.broken_links > 0 and config.fail_on_error then
+    debug_log("Failing build due to broken links")
+    quarto.log.error("Build failed: broken links detected")
+    -- Quarto's error() only logs, so exit directly to fail the build
+    os.exit(1)
+  end
 end
 
 -- ============================================================================
 -- FILTER EXPORT
 -- ============================================================================
 
---- Export the filter functions to Pandoc.
--- The filters are executed in the order: Meta, Link, Pandoc.
--- @return Array of filter tables for Pandoc
+-- Configuration is read first, then every link is checked, then the report runs.
 return {
-  { Meta = Meta },
-  { Link = Link },
-  { Pandoc = Pandoc }
+  { Meta = read_config },
+  { Link = check_link },
+  { Pandoc = report_results }
 }
