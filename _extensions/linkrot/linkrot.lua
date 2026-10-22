@@ -109,13 +109,15 @@ end
 
 --- Get cached result for a URL if caching is enabled.
 -- @param url The URL to look up
--- @return cached_result The cached validation result (true/false), or nil if not cached
+-- @return cached_result The cached { valid, status } record, or nil if not cached
 -- @return was_cached true if result was found in cache, false otherwise
 -- @see state.checked_urls
 local function get_cached_result(url)
-  if config.cache_results and state.checked_urls[url] ~= nil then
-    debug_log("Using cached result for: " .. url .. " (valid: " .. tostring(state.checked_urls[url]) .. ")")
-    return state.checked_urls[url], true
+  local cached = state.checked_urls[url]
+  if config.cache_results and cached ~= nil then
+    debug_log("Using cached result for: " .. url .. " (valid: " .. tostring(cached.valid) ..
+      ", status: " .. tostring(cached.status) .. ")")
+    return cached, true
   end
   return nil, false
 end
@@ -124,11 +126,12 @@ end
 -- Only caches if config.cache_results is true.
 -- @param url The URL that was checked
 -- @param is_valid Whether the URL is valid (true) or broken (false)
+-- @param status The HTTP status code or error message, if any
 -- @see state.checked_urls
 -- @see config.cache_results
-local function cache_result(url, is_valid)
+local function cache_result(url, is_valid, status)
   if config.cache_results then
-    state.checked_urls[url] = is_valid
+    state.checked_urls[url] = { valid = is_valid, status = status }
   end
 end
 
@@ -248,7 +251,8 @@ end
 -- Results are cached if caching is enabled.
 -- @param url The URL to check
 -- @return is_valid true if URL is valid or skipped, false if broken
--- @return status_code The HTTP status code, or nil if cached/skipped
+-- @return status_code The HTTP status code, or nil if skipped
+-- @return was_cached true if the result came from the cache
 -- @see get_cached_result
 -- @see should_skip_url
 -- @see check_url_accessibility
@@ -258,23 +262,23 @@ local function check_url(url)
   -- Check cache first
   local cached_result, was_cached = get_cached_result(url)
   if was_cached then
-    return cached_result
+    return cached_result.valid, cached_result.status, true
   end
-  
+
   -- Check if we should skip this URL
   if should_skip_url(url) then
     cache_result(url, true)
     return true
   end
-  
+
   debug_log("Checking URL: " .. url)
-  
+
   -- Perform actual check
   local is_valid, status_code = check_url_accessibility(url)
-  
+
   -- Cache the result
-  cache_result(url, is_valid)
-  
+  cache_result(url, is_valid, status_code)
+
   return is_valid, status_code
 end
 
@@ -302,16 +306,22 @@ end
 
 --- Process and check a single link.
 -- Increments check_count, validates the URL, and records if broken.
+-- A URL answered from the cache was already counted and recorded,
+-- so it is not counted or listed again.
 -- @param url The URL to check
 -- @param link_text The anchor text of the link
 -- @see check_url
 -- @see add_broken_link
 -- @see state.check_count
 local function process_link(url, link_text)
+  local is_valid, status_code, was_cached = check_url(url)
+
+  if was_cached then
+    return
+  end
+
   state.check_count = state.check_count + 1
-  
-  local is_valid, status_code = check_url(url)
-  
+
   if not is_valid then
     add_broken_link(url, link_text, status_code)
   end
