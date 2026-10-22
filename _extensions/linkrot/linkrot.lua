@@ -144,12 +144,22 @@ end
 -- @see config.user_agent
 local function build_windows_curl_command(url)
   local escaped_url = url:gsub('"', '""')
+  local escaped_user_agent = config.user_agent:gsub('"', '""')
   return string.format(
     'curl.exe -s -o NUL -w "%%{http_code}" -L --max-time %d -A "%s" "%s" 2>NUL',
     config.timeout,
-    config.user_agent,
+    escaped_user_agent,
     escaped_url
   )
+end
+
+--- Quote a value for a POSIX shell so it is passed to curl literally.
+-- Wraps the value in single quotes and writes each embedded single
+-- quote as '\'' so $(...), backticks and variables are not expanded.
+-- @param value The string to quote
+-- @return The single-quoted string
+local function posix_quote(value)
+  return "'" .. value:gsub("'", "'\\''") .. "'"
 end
 
 --- Build curl command for Unix/Linux/macOS platforms.
@@ -160,10 +170,10 @@ end
 -- @see config.user_agent
 local function build_unix_curl_command(url)
   return string.format(
-    'curl -s -o /dev/null -w "%%{http_code}" -L --max-time %d -A "%s" "%s" 2>/dev/null',
+    'curl -s -o /dev/null -w "%%{http_code}" -L --max-time %d -A %s %s 2>/dev/null',
     config.timeout,
-    config.user_agent,
-    url:gsub('"', '\\"')
+    posix_quote(config.user_agent),
+    posix_quote(url)
   )
 end
 
