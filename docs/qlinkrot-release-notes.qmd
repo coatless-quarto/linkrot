@@ -25,6 +25,12 @@ format:
   - `skip-patterns`: Define patterns for links to skip during checks.
 - Uses the `curl` command-line tool for robust link checking.
 - Supports both HTTP and HTTPS links.
+- `report-scope: project` collects the broken links of every page in a project
+  in one `output-file` report, grouped by page. Re-rendering one page, for
+  example in `quarto preview`, updates only that page's entry. The default,
+  `report-scope: document`, writes a report for each document.
+- linkrot names the page above its broken links, as in "Broken links in
+  posts/news.qmd:", in the console and in `output-file`.
 
 ## Bug fixes
 
@@ -50,7 +56,6 @@ format:
 - The README and FAQ now show "unavailable", the status linkrot reports when a
   link gives no response, instead of "timeout/error".
 - The FAQ now explains that links are checked one at a time and once per output
-  format, that each document replaces the `output-file` report, and that image
-  sources and raw HTML links are not checked. Its GitHub Actions example now
-  installs `coatless-quarto/linkrot`.
+  format, and that image sources and raw HTML links are not checked. Its GitHub
+  Actions example now installs `coatless-quarto/linkrot`.
 
