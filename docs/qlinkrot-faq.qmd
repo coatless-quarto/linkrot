@@ -159,6 +159,8 @@ extensions:
 ```
 
 Results will be written to the specified file in addition to console output.
+To collect the results of every page in a project in one file, also set `report-scope: project`
+(see [checking a whole project](#is-there-a-way-to-check-links-across-my-entire-quarto-project-at-once)).
 
 ## What's the default timeout for checking links?
 
@@ -313,7 +315,7 @@ Then: `quarto render --profile ci`
 
 ## Is there a way to check links across my entire Quarto project at once?
 
-Yes! Add the filter to your `_quarto.yml` project file:
+Yes! Add the filter to your `_quarto.yml` project file and set `report-scope: project`:
 
 ```yaml
 project:
@@ -324,15 +326,38 @@ filters:
 
 extensions:
   linkrot:
-    fail-on-error: true
+    report-scope: project
     output-file: "linkrot-report.txt"
 ```
 
-This applies linkrot to all documents in your project.
+This applies linkrot to all documents in your project and collects every page's broken links
+in one `linkrot-report.txt` at the project root, grouped by page. The console still shows each
+page's report as it renders.
 
-Each document writes its own report to `output-file`, relative to that document's folder,
-and replaces the file's previous contents. In a project, the file therefore holds the report
-for the last document rendered in that folder. The console shows the report for every document.
+With the default `report-scope: document`, each document replaces `output-file` with its own
+report, so the file shows only the last page rendered.
+
+## How does the project report stay current when I re-render one page?
+
+With `report-scope: project`, linkrot saves each page's results in `.quarto/linkrot/`, one
+file per page, and rebuilds the report from those files after every page it checks.
+Re-rendering a page, with `quarto render page.qmd` or in `quarto preview`, replaces that page's
+results and keeps the others. Pages you delete drop out of the report the next time any page
+renders. To start the report over, delete `.quarto/linkrot/`.
+
+Quarto projects usually list `.quarto/` in `.gitignore`; add it if yours doesn't.
+Outside a project, the document's folder takes the place of the project.
+
+## Can the build fail and still report every broken link in the project?
+
+`fail-on-error` works per page: the render stops at the first page with a broken link, after
+that page's results are saved. To list every broken link before failing, render with
+`fail-on-error: false` and check the report afterwards, for example in CI:
+
+```bash
+quarto render
+grep -q "Broken links found: 0" linkrot-report.txt
+```
 
 
 # Troubleshooting
