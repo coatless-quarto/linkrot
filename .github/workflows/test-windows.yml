@@ -57,3 +57,31 @@ jobs:
             echo "Test failed: No HTML output found"
             exit 1
           fi
+
+      - name: Verify a broken link fails the render
+        shell: bash
+        run: |
+          cat > test/broken.qmd << 'EOF'
+          ---
+          title: "Linkrot Windows Broken Link Test"
+          format: html
+          filters:
+            - linkrot
+          extensions:
+            linkrot:
+              fail-on-error: true
+              timeout: 15
+              output-file: broken-report.txt
+          ---
+
+          This link should be reported as broken:
+
+          - [Unreachable](https://linkrot-test.invalid/)
+          EOF
+          if quarto render test/broken.qmd; then
+            echo "Test failed: render succeeded despite a broken link"
+            exit 1
+          fi
+          cat test/broken-report.txt
+          grep -q "Status: unavailable" test/broken-report.txt
+          echo "Test passed: broken link reported and render failed"
