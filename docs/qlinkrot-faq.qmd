@@ -1,6 +1,6 @@
 ---
 title: "Frequently Asked Questions"
-date: "11-23-2024"
+date: "11-23-2025"
 date-modified: last-modified
 engine: markdown
 format: 
@@ -26,6 +26,7 @@ The `linkrot` extension checks all external links with HTTP or HTTPS schemes, in
 - **Reference-style links**: `[text][ref]` with `[ref]: https://example.com`
 
 Internal links (anchors, relative paths) and non-HTTP schemes (mailto:, ftp:, etc.) are not checked.
+Image sources and links written as raw HTML (`<a href="...">`) are not checked either.
 
 ## Why should I use linkrot?
 
@@ -118,19 +119,22 @@ This is especially useful in CI/CD pipelines to prevent deployment of documents 
 
 ## Can I skip checking certain URLs?
 
-Yes, use the `skip-patterns` option with regex patterns:
+Yes, use the `skip-patterns` option with [Lua patterns](https://www.lua.org/manual/5.4/manual.html#6.4.1):
 
 ```yaml
 extensions:
   linkrot:
     skip-patterns:
       - "localhost"
-      - "127\\.0\\.0\\.1"
-      - "example\\.com"
-      - "internal\\.company\\.com"
+      - "127%.0%.0%.1"
+      - "example%.com"
+      - "internal%.company%.com"
 ```
 
 Any URL matching these patterns will be skipped.
+
+Lua patterns are not regular expressions. Escape special characters such as `.` and `-` with `%`, not a backslash.
+Metadata values are read as Markdown, so `"example\\.com"` reaches linkrot as `example.com`, where `.` matches any character.
 
 ## How do I enable debug mode?
 
@@ -183,7 +187,8 @@ This can help if some sites block the default user agent.
 ## When are links checked during the rendering process?
 
 Links are checked during the Pandoc filter stage, after the document is parsed but before
-format-specific rendering. This means checks happen once regardless of output format.
+format-specific rendering. The filter runs once for each output format, so a document rendered
+to both HTML and PDF checks its links twice.
 
 ## Does linkrot check the same URL multiple times?
 
@@ -202,7 +207,7 @@ Status codes 400+ are considered broken:
 
 - **400-499**: Client errors (e.g., 404 Not Found)
 - **500-599**: Server errors
-- **timeout/error**: Network issues
+- **unavailable**: No response (timeout, DNS failure, or connection error)
 
 ## Does linkrot follow redirects?
 
@@ -211,7 +216,7 @@ The final destination is checked, not intermediate redirects.
 
 ## What happens if my internet connection is down?
 
-All links will be marked as broken with status "timeout/error". 
+All links will be marked as broken with status "unavailable". 
 The extension requires an active internet connection to check external links.
 
 ## Does linkrot affect rendering speed?
@@ -219,7 +224,7 @@ The extension requires an active internet connection to check external links.
 Yes, checking links takes time. However:
 
 - Caching prevents redundant checks
-- Checks run in parallel with rendering
+- Links are checked one at a time, and rendering waits for each check
 - Most links respond within 1-2 seconds
 - You can increase timeout for slow sites
 
@@ -282,9 +287,9 @@ jobs:
   check-links:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v7
       - uses: quarto-dev/quarto-actions/setup@v2
-      - run: quarto add --no-prompt linkrot
+      - run: quarto add --no-prompt coatless-quarto/linkrot
       - run: quarto render document.qmd
 ```
 
@@ -325,6 +330,10 @@ extensions:
 
 This applies linkrot to all documents in your project.
 
+Each document writes its own report to `output-file`, relative to that document's folder,
+and replaces the file's previous contents. In a project, the file therefore holds the report
+for the last document rendered in that folder. The console shows the report for every document.
+
 
 # Troubleshooting
 
@@ -332,7 +341,7 @@ This applies linkrot to all documents in your project.
 
 First, ensure that:
 
-1. The `linkrot` extension is properly installed in your `_extensions/linkrot/` directory
+1. The `linkrot` extension is properly installed in your `_extensions/coatless-quarto/linkrot/` directory
 2. You've added `filters: [linkrot]` to your document's YAML front matter
 3. Your document contains external HTTP/HTTPS links (not just internal anchors)
 4. `curl` is installed and accessible: run `curl --version`
@@ -404,12 +413,12 @@ extensions:
   linkrot:
     debug: true
     skip-patterns:
-      - "example\\.com"
+      - "example%.com"
 ```
 
-Debug output will show: `[linkrot] Skipping URL (matches pattern 'example\.com'): https://example.com`
+Debug output will show: `[linkrot] Skipping URL (matches pattern 'example%.com'): https://example.com`
 
-Remember to escape dots: `example\\.com` not `example.com`
+Remember to escape dots with `%`: `example%.com`, not `example.com` or `example\\.com`
 
 ## Can I see the actual curl commands being executed?
 
@@ -445,7 +454,7 @@ extensions:
 extensions:
   linkrot:
     skip-patterns:
-      - "slow-site\\.com"
+      - "slow%-site%.com"
 ```
 
 **Reduce timeout**:
