@@ -60,6 +60,7 @@ extensions:
     cache-results: true       # Cache results to avoid checking the same URL multiple times
     debug: false              # Enable debug logging
     output-file: "linkrot-report.txt" # Write results to a file
+    report-scope: document    # Set to project for one report covering every page
     skip-patterns:            # List of Lua patterns to skip
       - "example%.com"
       - "localhost"
@@ -92,6 +93,12 @@ extensions:
 
 - Path to a file where results will be written. If not specified, results are only shown in the console.
 
+#### report-scope (default: `"document"`)
+
+- `document`: `output-file` holds this document's report. In a project, each document replaces the file with its own report.
+- `project`: `output-file` holds one report for every document in the project, grouped by page. The path is relative to the project directory.
+- With `project`, linkrot keeps each page's results in `.quarto/linkrot/`, so re-rendering one page, for example in `quarto preview`, updates only that page's entry. Delete that folder to start the report over.
+
 #### skip-patterns
 
 - List of [Lua patterns](https://www.lua.org/manual/5.4/manual.html#6.4.1), not regular expressions. URLs matching any pattern will be skipped (not checked).
@@ -106,10 +113,25 @@ When the extension runs, you'll see output like this in the console:
 Total external links checked: 15
 Broken links found: 2
 
-Broken links:
+Broken links in my-document.qmd:
   1. [Example Link] https://example.com/broken-page (Status: 404)
   2. [Another Link] https://nonexistent-site-xyz123.com (Status: unavailable)
 ```
 
 You can also specify an output file to save the results.
+With `report-scope: project`, that file lists the broken links of every page in the project:
+
+```default
+=== Linkrot Results ===
+Documents checked: 3
+Total external links checked: 5
+Broken links found: 3
+
+Broken links in guide.qmd:
+  1. [install page] https://example.com/old/install (Status: 404)
+  2. [mirror] https://mirror.example.org/ (Status: unavailable)
+
+Broken links in posts/news.qmd:
+  1. [announcement] https://example.com/news/2024 (Status: 404)
+```
 
