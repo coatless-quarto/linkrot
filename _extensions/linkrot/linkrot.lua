@@ -427,14 +427,16 @@ end
 -- ============================================================================
 
 --- Handle build failure if configured.
--- Triggers a Lua error to fail the build if broken links were found
--- and fail_on_error is enabled.
+-- Stops the render with exit status 1 if broken links were found
+-- and fail_on_error is enabled. Quarto's error() only logs, so the
+-- process is exited directly.
 -- @see state.broken_count
 -- @see config.fail_on_error
 local function handle_build_failure()
   if state.broken_count > 0 and config.fail_on_error then
     debug_log("Failing build due to broken links")
-    error("Build failed: broken links detected")
+    quarto.log.error("Build failed: broken links detected")
+    os.exit(1)
   end
 end
 
