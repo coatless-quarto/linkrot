@@ -25,37 +25,13 @@ format:
   - `skip-patterns`: Define patterns for links to skip during checks.
 - Uses the `curl` command-line tool for robust link checking.
 - Supports both HTTP and HTTPS links.
-- `report-scope: project` collects the broken links of every page in a project
-  in one `output-file` report, grouped by page. Re-rendering one page, for
-  example in `quarto preview`, updates only that page's entry. The default,
-  `report-scope: document`, writes a report for each document.
-- linkrot names the page above its broken links, as in "Broken links in
-  posts/news.qmd:", in the console and in `output-file`.
+- `report-scope: project` gathers every page's broken links into one report, grouped by page and kept up to date as pages re-render. Reports and console output name the page each broken link is on.
 
 ## Bug fixes
 
-- `fail-on-error: true` now stops the render with exit status 1 when a link is
-  broken, after the report is printed and written to `output-file`. Previously,
-  Quarto logged the error but still wrote the output and exited 0, so CI
-  builds passed.
-- linkrot now passes each URL and the `user-agent` value to `curl` literally on
-  macOS and Linux. Previously, a link containing `$(...)` or backticks ran that
-  command while the document rendered.
-- `timeout` now accepts fractional values such as `2.5`. Previously, they
-  stopped the render with "number has no integer representation".
-- linkrot now counts and lists each URL once, with its real status, even when
-  it is linked several times. Previously, each repeat was added to the totals
-  again and listed with the status "timeout/error".
+- `fail-on-error: true` fails the build when a link is broken, so CI catches it.
+- Link checks are sturdier: URLs are passed to `curl` safely, `timeout` accepts fractional seconds, and repeated links are checked once.
 
 ## Documentation
 
-- `skip-patterns` is now documented as a list of Lua patterns, not regular
-  expressions, with examples that escape `.` and `-` with `%`. The earlier
-  examples used a backslash, as in `example\\.com`, which is dropped when
-  metadata is read as Markdown, so `.` matched any character.
-- The README and FAQ now show "unavailable", the status linkrot reports when a
-  link gives no response, instead of "timeout/error".
-- The FAQ now explains that links are checked one at a time and once per output
-  format, and that image sources and raw HTML links are not checked. Its GitHub
-  Actions example now installs `coatless-quarto/linkrot`.
-
+- `skip-patterns` is documented as Lua patterns, with working examples.
