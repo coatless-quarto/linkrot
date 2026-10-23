@@ -159,6 +159,30 @@ local readers = {
   end
 }
 
+--- `skip-patterns` entries that are not valid Lua patterns, matched as plain text.
+---@type table<string, boolean>
+local plain_skip_patterns = {}
+
+--- Check whether a URL matches a `skip-patterns` entry. A malformed Lua
+--- pattern such as "[" raises an error that would stop the render, so the
+--- match runs in pcall. The first error warns, naming the entry and Lua's
+--- message, and from then on the entry is matched as plain text.
+---@param url string
+---@param pattern string
+---@return boolean
+local function matches_skip_pattern(url, pattern)
+  if not plain_skip_patterns[pattern] then
+    local ok, result = pcall(string.match, url, pattern)
+    if ok then
+      return result ~= nil
+    end
+    plain_skip_patterns[pattern] = true
+    quarto.log.warning("linkrot: skip-patterns entry '" .. pattern .. "' is not a valid Lua pattern (" ..
+      tostring(result) .. "). Matching it as plain text.")
+  end
+  return string.find(url, pattern, 1, true) ~= nil
+end
+
 --- Read `extensions.linkrot` from the document metadata into `config`.
 ---@param meta pandoc.Meta
 local function read_config(meta)
@@ -192,6 +216,15 @@ local function read_config(meta)
     end
   end
 
+  -- Check each skip pattern once now. Lua only reports a malformed part of a
+  -- pattern when matching reaches it, so match the entry against its own text,
+  -- which gets past a literal prefix ("[", "/old[", "docs%" all fail here).
+  -- An error after a class such as "%." shows up at the first URL that gets
+  -- that far instead.
+  for _, pattern in ipairs(config.skip_patterns) do
+    matches_skip_pattern(pattern, pattern)
+  end
+
   debug_log("Configuration loaded:")
   for _, option in ipairs(options) do
     local value = config[option.field]
@@ -213,7 +246,7 @@ end
 ---@return boolean
 local function should_skip_url(url)
   for _, pattern in ipairs(config.skip_patterns) do
-    if string.match(url, pattern) then
+    if matches_skip_pattern(url, pattern) then
       debug_log("Skipping URL (matches pattern '" .. pattern .. "'): " .. url)
       return true
     end
