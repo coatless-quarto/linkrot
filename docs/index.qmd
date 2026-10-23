@@ -103,6 +103,7 @@ extensions:
 
 - List of [Lua patterns](https://www.lua.org/manual/5.4/manual.html#6.4.1), not regular expressions. URLs matching any pattern will be skipped (not checked).
 - Escape special characters such as `.` and `-` with `%`, as in `example%.com`. A backslash does not work: metadata is read as Markdown, so `example\\.com` reaches linkrot as `example.com`.
+- An entry that isn't a valid Lua pattern, such as `[`, gets a warning and is matched as plain text.
 
 ## Example Output
 
