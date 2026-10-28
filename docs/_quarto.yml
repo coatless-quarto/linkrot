@@ -30,6 +30,8 @@ website:
       - section: "Extra"
         contents:
         - qlinkrot-release-notes.qmd
+        - href: https://blog.thecoatlessprofessor.com/projects/linkrot/
+          text: "Blog posts"
 
 callout-appearance: simple
 
