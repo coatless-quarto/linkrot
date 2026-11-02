@@ -53,7 +53,7 @@ quarto add coatless-quarto/linkrot
 
 ## Is the linkrot extension compatible with all Quarto versions?
 
-The `linkrot` extension requires Quarto v1.10.0 or later.
+The `linkrot` extension requires Quarto v1.11.0 or later.
 
 ## Do I need to install any additional dependencies?
 

@@ -18,7 +18,7 @@ If you are using version control, ensure that you include this directory in your
 
 ### Requirements
 
-- Quarto >= 1.10.0
+- Quarto >= 1.11.0
 - `curl` command-line tool:
   - **Linux/macOS**: Usually pre-installed
   - **Windows**: Built-in on Windows 10 (1803+) and Windows 11
