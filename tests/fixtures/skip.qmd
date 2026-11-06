@@ -1,0 +1,16 @@
+---
+title: "linkrot: skip-patterns"
+filters:
+  - linkrot
+extensions:
+  linkrot:
+    timeout: 5
+    output-file: report.txt
+    skip-patterns:
+      - "linkrot%-test%.invalid/skipped"
+      - "(unclosed"
+---
+
+- [Skipped by a Lua pattern](https://linkrot-test.invalid/skipped)
+- [Skipped by a malformed pattern, matched as plain text](https://linkrot-test.invalid/(unclosed)
+- [Checked and broken](https://linkrot-test.invalid/missing)

@@ -1,0 +1,11 @@
+project:
+  type: default
+
+filters:
+  - linkrot
+
+extensions:
+  linkrot:
+    timeout: 5
+    output-file: report.txt
+    report-scope: project

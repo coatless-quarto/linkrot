@@ -1,0 +1,5 @@
+---
+title: "Page B"
+---
+
+- [B broken link](https://linkrot-test.invalid/from-b)
