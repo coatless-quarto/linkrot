@@ -1,0 +1,11 @@
+---
+title: "linkrot: a broken link without fail-on-error"
+filters:
+  - linkrot
+extensions:
+  linkrot:
+    timeout: 2.5
+    output-file: report.txt
+---
+
+- [Unreachable](https://linkrot-test.invalid/missing)

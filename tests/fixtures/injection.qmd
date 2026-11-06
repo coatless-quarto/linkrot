@@ -1,0 +1,14 @@
+---
+title: "linkrot: URLs that try to run shell commands"
+filters:
+  - linkrot
+extensions:
+  linkrot:
+    timeout: 5
+---
+
+Pandoc percent-encodes spaces, braces and backticks in URLs, so these
+payloads use only characters it keeps: `$`, `(`, `)`, `'` and `;`.
+
+- [unquoted](https://linkrot-test.invalid/$(touch$IFS'pwned-dollar'))
+- [naive quotes](https://linkrot-test.invalid/x';touch$IFS'pwned-quote)
