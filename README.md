@@ -131,6 +131,12 @@ Broken links in posts/news.qmd:
   1. [announcement] https://example.com/news/2024 (Status: 404)
 ```
 
+## Learn more
+
+- [Documentation](https://quarto.thecoatlessprofessor.com/linkrot/)
+- [Release notes](https://quarto.thecoatlessprofessor.com/linkrot/qlinkrot-release-notes.html)
+- [Blog posts](https://blog.thecoatlessprofessor.com/projects/linkrot/)
+
 ## License
 
 linkrot is licensed under AGPL-3.0-or-later with an exception: what you write and render with linkrot stays yours, along with the output, under any terms you like. See [LICENSE](LICENSE) and [LICENSE-EXCEPTION.md](LICENSE-EXCEPTION.md).
